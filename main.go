@@ -60,9 +60,9 @@ func (i *Ite) makeToolbar() {
 	i.newToolButton = i.toolbarFrame.TButton(Txt("New"), Command(i.onNew))
 	i.openToolButton = i.toolbarFrame.TButton(Txt("Open"), Command(i.onOpen))
 	i.saveToolButton = i.toolbarFrame.TButton(Txt("Save"), Command(i.onSave))
-	i.cutToolButton = i.toolbarFrame.TButton(Txt("Cut"))
-	i.copyToolButton = i.toolbarFrame.TButton(Txt("Copy"))
-	i.pasteToolButton = i.toolbarFrame.TButton(Txt("Paste"))
+	i.cutToolButton = i.toolbarFrame.TButton(Txt("Cut"), Command(i.onCut))
+	i.copyToolButton = i.toolbarFrame.TButton(Txt("Copy"), Command(i.onCopy))
+	i.pasteToolButton = i.toolbarFrame.TButton(Txt("Paste"), Command(i.onPaste))
 	i.exitToolButton = i.toolbarFrame.TButton(Txt("Exit"), Command(i.onQuit))
 }
 
@@ -138,6 +138,18 @@ func (i *Ite) onSave() {
 	}
 	App.WmTitle(fmt.Sprintf("%s - ITE", filepath.Base(i.currentFile)))
 	i.editText.SetModified(false)
+}
+
+func (i *Ite) onCut() {
+	i.editText.Cut()
+}
+
+func (i *Ite) onCopy() {
+	i.editText.Copy()
+}
+
+func (i *Ite) onPaste() {
+	i.editText.Paste()
 }
 
 func (i *Ite) onQuit() { Destroy(App) }
