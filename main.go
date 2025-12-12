@@ -6,7 +6,21 @@ package main
 
 import . "modernc.org/tk9.0"
 
+type Ite struct {
+}
+
 func main() {
-	Pack(Button(Txt("Hello"), Command(func() { Destroy(App) })))
+	NewIte().Run()
+}
+
+func (i *Ite) Run() {
+	WmGeometry(App, "860x580")
+	App.Center()
+	WmDeiconify(App)
 	App.Wait()
+}
+
+func NewIte() *Ite {
+	ite := &Ite{}
+	return ite
 }
