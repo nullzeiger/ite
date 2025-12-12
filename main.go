@@ -29,8 +29,10 @@ func (i *Ite) Run() {
 }
 
 func NewIte() *Ite {
-	ite := &Ite{}
-	return ite
+	i := &Ite{}
+	i.makeWidgets()
+	i.makeLayout()
+	return i
 }
 
 func (i *Ite) makeToolbar() {
@@ -53,4 +55,13 @@ func (i *Ite) layoutToolbar() {
 	Grid(i.copyToolButton, Row(0), Column(5), opts)
 	Grid(i.pasteToolButton, Row(0), Column(6), opts)
 	Grid(i.exitToolButton, Row(0), Column(7), opts)
+}
+
+func (i *Ite) makeWidgets() {
+	i.makeToolbar()
+}
+
+func (i *Ite) makeLayout() {
+	i.layoutToolbar()
+	Grid(i.toolbarFrame, Row(0), Column(0), Sticky(WE))
 }
