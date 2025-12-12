@@ -59,7 +59,7 @@ func (i *Ite) makeToolbar() {
 	i.toolbarFrame = TFrame(Relief(RAISED))
 	i.newToolButton = i.toolbarFrame.TButton(Txt("New"), Command(i.onNew))
 	i.openToolButton = i.toolbarFrame.TButton(Txt("Open"), Command(i.onOpen))
-	i.saveToolButton = i.toolbarFrame.TButton(Txt("Save"))
+	i.saveToolButton = i.toolbarFrame.TButton(Txt("Save"), Command(i.onSave))
 	i.cutToolButton = i.toolbarFrame.TButton(Txt("Cut"))
 	i.copyToolButton = i.toolbarFrame.TButton(Txt("Copy"))
 	i.pasteToolButton = i.toolbarFrame.TButton(Txt("Paste"))
@@ -119,6 +119,23 @@ func (i *Ite) onOpen() {
 	i.editText.Clear()
 	i.editText.Insert("1.0", string(data))
 	i.currentFile = path
+	App.WmTitle(fmt.Sprintf("%s - ITE", filepath.Base(i.currentFile)))
+	i.editText.SetModified(false)
+}
+
+func (i *Ite) onSave() {
+	if i.currentFile == "" {
+		path := GetSaveFile(Title("Save as..."), Initialdir("."))
+		if path == "" {
+			return
+		}
+		i.currentFile = path
+	}
+	content := i.editText.Text()
+	if err := os.WriteFile(i.currentFile, []byte(content), 0644); err != nil {
+		fmt.Println("Error saving file:", err)
+		return
+	}
 	App.WmTitle(fmt.Sprintf("%s - ITE", filepath.Base(i.currentFile)))
 	i.editText.SetModified(false)
 }
