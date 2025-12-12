@@ -59,6 +59,13 @@ func (i *Ite) makeToolbar() {
 	i.exitToolButton = i.toolbarFrame.TButton(Txt("Exit"), Command(func() { Destroy(App) }))
 }
 
+func (i *Ite) layoutEditor() {
+	Grid(i.editText, Row(0), Column(0), Sticky(NEWS))
+	Grid(i.editVScrollbar, Row(0), Column(1), Sticky(NS))
+	GridRowConfigure(i.editFrame, 0, Weight(1))
+	GridColumnConfigure(i.editFrame, 0, Weight(1))
+}
+
 func (i *Ite) layoutToolbar() {
 	opts := Opts{Sticky(W)}
 	Grid(i.newToolButton, Row(0), Column(1), opts)
@@ -78,4 +85,8 @@ func (i *Ite) makeWidgets() {
 func (i *Ite) makeLayout() {
 	i.layoutToolbar()
 	Grid(i.toolbarFrame, Row(0), Column(0), Sticky(WE))
+	i.layoutEditor()
+	Grid(i.editFrame, Row(1), Column(0), Sticky(NEWS))
+	GridColumnConfigure(App, 0, Weight(1))
+	GridRowConfigure(App, 1, Weight(1))
 }
