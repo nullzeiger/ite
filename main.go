@@ -7,6 +7,14 @@ package main
 import . "modernc.org/tk9.0"
 
 type Ite struct {
+	toolbarFrame    *TFrameWidget
+	newToolButton   *TButtonWidget
+	openToolButton  *TButtonWidget
+	saveToolButton  *TButtonWidget
+	cutToolButton   *TButtonWidget
+	copyToolButton  *TButtonWidget
+	pasteToolButton *TButtonWidget
+	exitToolButton  *TButtonWidget
 }
 
 func main() {
