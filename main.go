@@ -18,6 +18,7 @@ type Ite struct {
 	editFrame       *TFrameWidget
 	editText        *TextWidget
 	editVScrollbar  *TScrollbarWidget
+	currentFile     string
 }
 
 func main() {
@@ -50,7 +51,7 @@ func (i *Ite) makeEditor() {
 
 func (i *Ite) makeToolbar() {
 	i.toolbarFrame = TFrame(Relief(RAISED))
-	i.newToolButton = i.toolbarFrame.TButton(Txt("New"))
+	i.newToolButton = i.toolbarFrame.TButton(Txt("New"), Command(i.onNew))
 	i.openToolButton = i.toolbarFrame.TButton(Txt("Open"))
 	i.saveToolButton = i.toolbarFrame.TButton(Txt("Save"))
 	i.cutToolButton = i.toolbarFrame.TButton(Txt("Cut"))
@@ -89,6 +90,13 @@ func (i *Ite) makeLayout() {
 	Grid(i.editFrame, Row(1), Column(0), Sticky(NEWS))
 	GridColumnConfigure(App, 0, Weight(1))
 	GridRowConfigure(App, 1, Weight(1))
+}
+
+func (i *Ite) onNew() {
+	i.editText.Clear()
+	i.currentFile = ""
+	App.WmTitle("Untitled - ITE")
+	i.editText.SetModified(false)
 }
 
 func (i *Ite) onQuit() { Destroy(App) }
