@@ -32,3 +32,14 @@ func NewIte() *Ite {
 	ite := &Ite{}
 	return ite
 }
+
+func (i *Ite) makeToolbar() {
+	i.toolbarFrame = TFrame(Relief(RAISED))
+	i.newToolButton = i.toolbarFrame.TButton(Txt("New"))
+	i.openToolButton = i.toolbarFrame.TButton(Txt("Open"))
+	i.saveToolButton = i.toolbarFrame.TButton(Txt("Save"))
+	i.cutToolButton = i.toolbarFrame.TButton(Txt("Cut"))
+	i.copyToolButton = i.toolbarFrame.TButton(Txt("Copy"))
+	i.pasteToolButton = i.toolbarFrame.TButton(Txt("Paste"))
+	i.exitToolButton = i.toolbarFrame.TButton(Txt("Exit"), Command(func() { Destroy(App) }))
+}
