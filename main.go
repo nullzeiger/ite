@@ -56,7 +56,7 @@ func (i *Ite) makeToolbar() {
 	i.cutToolButton = i.toolbarFrame.TButton(Txt("Cut"))
 	i.copyToolButton = i.toolbarFrame.TButton(Txt("Copy"))
 	i.pasteToolButton = i.toolbarFrame.TButton(Txt("Paste"))
-	i.exitToolButton = i.toolbarFrame.TButton(Txt("Exit"), Command(func() { Destroy(App) }))
+	i.exitToolButton = i.toolbarFrame.TButton(Txt("Exit"), Command(i.onQuit))
 }
 
 func (i *Ite) layoutEditor() {
@@ -90,3 +90,5 @@ func (i *Ite) makeLayout() {
 	GridColumnConfigure(App, 0, Weight(1))
 	GridRowConfigure(App, 1, Weight(1))
 }
+
+func (i *Ite) onQuit() { Destroy(App) }
