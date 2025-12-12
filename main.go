@@ -4,7 +4,13 @@
 
 package main
 
-import . "modernc.org/tk9.0"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	. "modernc.org/tk9.0"
+)
 
 type Ite struct {
 	toolbarFrame    *TFrameWidget
@@ -52,7 +58,7 @@ func (i *Ite) makeEditor() {
 func (i *Ite) makeToolbar() {
 	i.toolbarFrame = TFrame(Relief(RAISED))
 	i.newToolButton = i.toolbarFrame.TButton(Txt("New"), Command(i.onNew))
-	i.openToolButton = i.toolbarFrame.TButton(Txt("Open"))
+	i.openToolButton = i.toolbarFrame.TButton(Txt("Open"), Command(i.onOpen))
 	i.saveToolButton = i.toolbarFrame.TButton(Txt("Save"))
 	i.cutToolButton = i.toolbarFrame.TButton(Txt("Cut"))
 	i.copyToolButton = i.toolbarFrame.TButton(Txt("Copy"))
@@ -96,6 +102,24 @@ func (i *Ite) onNew() {
 	i.editText.Clear()
 	i.currentFile = ""
 	App.WmTitle("Untitled - ITE")
+	i.editText.SetModified(false)
+}
+
+func (i *Ite) onOpen() {
+	paths := GetOpenFile(Title("Open"), Initialdir("."))
+	if len(paths) == 0 {
+		return
+	}
+	path := paths[0]
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return
+	}
+	i.editText.Clear()
+	i.editText.Insert("1.0", string(data))
+	i.currentFile = path
+	App.WmTitle(fmt.Sprintf("%s - ITE", filepath.Base(i.currentFile)))
 	i.editText.SetModified(false)
 }
 
