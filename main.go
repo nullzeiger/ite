@@ -15,6 +15,9 @@ type Ite struct {
 	copyToolButton  *TButtonWidget
 	pasteToolButton *TButtonWidget
 	exitToolButton  *TButtonWidget
+	editFrame       *TFrameWidget
+	editText        *TextWidget
+	editVScrollbar  *TScrollbarWidget
 }
 
 func main() {
@@ -33,6 +36,16 @@ func NewIte() *Ite {
 	i.makeWidgets()
 	i.makeLayout()
 	return i
+}
+
+func (i *Ite) makeEditor() {
+	i.editFrame = TFrame()
+	i.editText = i.editFrame.Text(
+			Yscrollcommand(func(event *Event) {
+			event.ScrollSet(i.editVScrollbar)
+		}))
+	i.editVScrollbar = i.editFrame.TScrollbar(Command(
+		func(event *Event) { event.Yview(i.editText) }))
 }
 
 func (i *Ite) makeToolbar() {
@@ -59,6 +72,7 @@ func (i *Ite) layoutToolbar() {
 
 func (i *Ite) makeWidgets() {
 	i.makeToolbar()
+	i.makeEditor()
 }
 
 func (i *Ite) makeLayout() {
