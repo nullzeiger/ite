@@ -12,6 +12,16 @@ import (
 	. "modernc.org/tk9.0"
 )
 
+const (
+	black = "#000000"
+	extremeblack = "#101010"
+	apricotwhite  = "#ffffea"
+	coolyellow = "#eceb91"
+	waterdew  = "#eaffff"
+	saltwater = "#d4ffff"
+	highball = "#8d8c39"
+)
+
 type Ite struct {
 	toolbarFrame    *TFrameWidget
 	newToolButton   *TButtonWidget
@@ -40,16 +50,45 @@ func (i *Ite) Run() {
 
 func NewIte() *Ite {
 	i := &Ite{}
+	i.globalStyle()
 	i.makeWidgets()
 	i.makeLayout()
 	return i
 }
 
+func (i *Ite) globalStyle() {
+	StyleConfigure("TButton", Background(waterdew),
+		Foreground(extremeblack),
+		Font("GoMono", 11, "bold"))
+	StyleMap("TButton", Background, "active", saltwater)
+	StyleConfigure("Vertical.TScrollbar",
+		Background(apricotwhite),
+		Troughcolor(highball),
+		Borderwidth(1),
+		Arrowsize(0))
+	StyleConfigure("TFrame", Background(waterdew))
+	StyleMap("TScrollbar", Background, "active", apricotwhite)
+	App.Configure(Background(apricotwhite))
+}
+
+func textStyle() Opts {
+	return Opts{
+		Font("GoMono", 13),
+		Background(apricotwhite),
+		Foreground(black),
+		Insertbackground(black),
+		Selectbackground(coolyellow),
+		Selectforeground(black),
+		Tabs("1c"),
+	}
+}
+
 func (i *Ite) makeEditor() {
 	i.editFrame = TFrame()
 	i.editText = i.editFrame.Text(
-			Yscrollcommand(func(event *Event) {
-			event.ScrollSet(i.editVScrollbar)
+		textStyle(),
+		Yscrollcommand(func(event *Event) {
+		event.ScrollSet(i.editVScrollbar)
 		}))
 	i.editVScrollbar = i.editFrame.TScrollbar(Command(
 		func(event *Event) { event.Yview(i.editText) }))
