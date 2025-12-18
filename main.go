@@ -7,34 +7,35 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	. "modernc.org/tk9.0"
 )
 
 const (
-	black = "#000000"
-	extremeblack = "#101010"
-	apricotwhite  = "#ffffea"
-	coolyellow = "#eceb91"
-	waterdew  = "#eaffff"
-	saltwater = "#d4ffff"
-	highball = "#8d8c39"
+	colBlack        = "#000000"
+	colExtremeBlack = "#101010"
+	colApricotWhite = "#ffffea"
+	colCoolYellow   = "#eceb91"
+	colWaterDew     = "#eaffff"
+	colSaltWater    = "#d4ffff"
+	colHighBall     = "#8d8c39"
+	colRed          = "#ff0000"
+	colDarkGreen    = "#006400"
 )
 
 type Ite struct {
-	toolbarFrame    *TFrameWidget
-	newToolButton   *TButtonWidget
-	openToolButton  *TButtonWidget
-	saveToolButton  *TButtonWidget
-	cutToolButton   *TButtonWidget
-	copyToolButton  *TButtonWidget
-	pasteToolButton *TButtonWidget
-	exitToolButton  *TButtonWidget
-	editFrame       *TFrameWidget
-	editText        *TextWidget
-	editVScrollbar  *TScrollbarWidget
-	currentFile     string
+	editFrame         *TFrameWidget
+	toolbarFrame      *TFrameWidget
+	editText          *TextWidget
+	editVScrollbar    *TScrollbarWidget
+	currentFile       string
+	statusFrame       *TFrameWidget
+	statusLabelCursor *TLabelWidget
+	statusLabelFile   *TLabelWidget
+	statusLabelGo     *TLabelWidget
 }
 
 func main() {
@@ -42,53 +43,65 @@ func main() {
 }
 
 func (i *Ite) Run() {
-	WmGeometry(App, "860x580")
-	App.Center()
+	WmGeometry(App, "950x600")
 	WmDeiconify(App)
 	App.Wait()
 }
 
 func NewIte() *Ite {
 	i := &Ite{}
-	i.globalStyle()
+	App.WmTitle("Untitled - ITE")
+	WmProtocol(App, "WM_DELETE_WINDOW", i.onQuit)
 	i.makeWidgets()
 	i.makeLayout()
+	i.bindShortcuts()
+
+	i.globalStyle()
 	return i
 }
 
 func (i *Ite) globalStyle() {
-	StyleConfigure("TButton", Background(waterdew),
-		Foreground(extremeblack),
+	StyleConfigure("TButton", Background(colWaterDew),
+		Foreground(colExtremeBlack),
 		Font("GoMono", 11, "bold"))
-	StyleMap("TButton", Background, "active", saltwater)
+	StyleMap("TButton", Background, "active", colSaltWater)
 	StyleConfigure("Vertical.TScrollbar",
-		Background(apricotwhite),
-		Troughcolor(highball),
+		Background(colApricotWhite),
+		Troughcolor(colHighBall),
 		Borderwidth(1),
 		Arrowsize(0))
-	StyleConfigure("TFrame", Background(waterdew))
-	StyleMap("TScrollbar", Background, "active", apricotwhite)
-	App.Configure(Background(apricotwhite))
+	StyleConfigure("TFrame", Background(colWaterDew))
+	StyleMap("TScrollbar", Background, "active", colApricotWhite)
+	App.Configure(Background(colApricotWhite))
 }
 
 func textStyle() Opts {
 	return Opts{
 		Font("GoMono", 13),
-		Background(apricotwhite),
-		Foreground(black),
-		Insertbackground(black),
-		Selectbackground(coolyellow),
-		Selectforeground(black),
+		Background(colApricotWhite),
+		Foreground(colBlack),
+		Insertbackground(colBlack),
+		Selectbackground(colCoolYellow),
+		Selectforeground(colBlack),
 		Tabs("1c"),
+		Wrap("word"),
+		Undo(true),
+	}
+}
+
+func statusStyle() Opts {
+	return Opts{
+		Background(colApricotWhite),
 	}
 }
 
 func (i *Ite) makeEditor() {
 	i.editFrame = TFrame()
+	i.editVScrollbar = i.editFrame.TScrollbar()
 	i.editText = i.editFrame.Text(
 		textStyle(),
 		Yscrollcommand(func(event *Event) {
-		event.ScrollSet(i.editVScrollbar)
+			event.ScrollSet(i.editVScrollbar)
 		}))
 	i.editVScrollbar = i.editFrame.TScrollbar(Command(
 		func(event *Event) { event.Yview(i.editText) }))
@@ -96,45 +109,69 @@ func (i *Ite) makeEditor() {
 
 func (i *Ite) makeToolbar() {
 	i.toolbarFrame = TFrame(Relief(RAISED))
-	i.newToolButton = i.toolbarFrame.TButton(Txt("New"), Command(i.onNew))
-	i.openToolButton = i.toolbarFrame.TButton(Txt("Open"), Command(i.onOpen))
-	i.saveToolButton = i.toolbarFrame.TButton(Txt("Save"), Command(i.onSave))
-	i.cutToolButton = i.toolbarFrame.TButton(Txt("Cut"), Command(i.onCut))
-	i.copyToolButton = i.toolbarFrame.TButton(Txt("Copy"), Command(i.onCopy))
-	i.pasteToolButton = i.toolbarFrame.TButton(Txt("Paste"), Command(i.onPaste))
-	i.exitToolButton = i.toolbarFrame.TButton(Txt("Exit"), Command(i.onQuit))
+
+	buttons := []struct {
+		text string
+		cmd  func()
+	}{
+		{"New", i.onNew},
+		{"Open", i.onOpen},
+		{"Save", i.onSave},
+		{"Cut", i.onCut},
+		{"Copy", i.onCopy},
+		{"Paste", i.onPaste},
+		{"Go to Line", i.onGoToLine},
+		{"Go Build", i.onGoBuild},
+		{"Go Run", i.onGoRun},
+		{"Exit", i.onQuit},
+	}
+
+	for col, btn := range buttons {
+		b := i.toolbarFrame.TButton(Txt(btn.text), Command(btn.cmd))
+		Grid(b, Row(0), Column(col), Sticky(W))
+	}
 }
 
-func (i *Ite) layoutEditor() {
-	Grid(i.editText, Row(0), Column(0), Sticky(NEWS))
-	Grid(i.editVScrollbar, Row(0), Column(1), Sticky(NS))
-	GridRowConfigure(i.editFrame, 0, Weight(1))
-	GridColumnConfigure(i.editFrame, 0, Weight(1))
-}
-
-func (i *Ite) layoutToolbar() {
-	opts := Opts{Sticky(W)}
-	Grid(i.newToolButton, Row(0), Column(1), opts)
-	Grid(i.openToolButton, Row(0), Column(2), opts)
-	Grid(i.saveToolButton, Row(0), Column(3), opts)
-	Grid(i.cutToolButton, Row(0), Column(4), opts)
-	Grid(i.copyToolButton, Row(0), Column(5), opts)
-	Grid(i.pasteToolButton, Row(0), Column(6), opts)
-	Grid(i.exitToolButton, Row(0), Column(7), opts)
+func (i *Ite) makeStatusbar() {
+	i.statusFrame = TFrame(Relief(SUNKEN))
+	i.statusLabelCursor = i.statusFrame.TLabel(Txt("Line:Column 0:0"), Background(colApricotWhite), Font("GoMono", 11))
+	i.statusLabelFile = i.statusFrame.TLabel(Txt("Not saved"), Background(colApricotWhite), Font("GoMono", 11))
+	i.statusLabelGo = i.statusFrame.TLabel(Txt("Go Command"), Background(colApricotWhite), Font("GoMono", 11))
 }
 
 func (i *Ite) makeWidgets() {
 	i.makeToolbar()
 	i.makeEditor()
+	i.makeStatusbar()
 }
 
 func (i *Ite) makeLayout() {
-	i.layoutToolbar()
 	Grid(i.toolbarFrame, Row(0), Column(0), Sticky(WE))
-	i.layoutEditor()
+
+	Grid(i.editText, Row(0), Column(0), Sticky(NEWS))
+	Grid(i.editVScrollbar, Row(0), Column(1), Sticky(NS))
+	GridRowConfigure(i.editFrame, 0, Weight(1))
+	GridColumnConfigure(i.editFrame, 0, Weight(1))
 	Grid(i.editFrame, Row(1), Column(0), Sticky(NEWS))
+
+	Grid(i.statusLabelCursor, Row(0), Column(0), Sticky(WE))
+	Grid(i.statusLabelFile, Row(0), Column(1), Sticky(WE))
+	Grid(i.statusLabelGo, Row(0), Column(2), Sticky(WE))
+	GridColumnConfigure(i.statusFrame, 0, Weight(1))
+	Grid(i.statusFrame, Row(2), Column(0), Sticky(WE))
+
 	GridColumnConfigure(App, 0, Weight(1))
 	GridRowConfigure(App, 1, Weight(1))
+}
+
+func (i *Ite) bindShortcuts() {
+	Bind(App, "<Control-n>", Command(i.onNew))
+	Bind(App, "<Control-o>", Command(i.onOpen))
+	Bind(App, "<Control-s>", Command(i.onSave))
+	Bind(App, "<Control-q>", Command(i.onQuit))
+	Bind(App, "<Control-g>", Command(i.onGoToLine))
+	Bind(i.editText, "<ButtonRelease-1>", Command(i.updateCursorPosition))
+	Bind(i.editText, "<KeyRelease>", Command(i.updateCursorPosition))
 }
 
 func (i *Ite) onNew() {
@@ -192,3 +229,91 @@ func (i *Ite) onPaste() {
 }
 
 func (i *Ite) onQuit() { Destroy(App) }
+
+func (i *Ite) updateCursorPosition() {
+	pos := i.editText.Index("insert")
+	i.statusLabelCursor.Configure(Txt("Line.Column " + pos))
+
+	if i.editText.Modified() {
+		i.statusLabelFile.Configure(Foreground(colRed))
+		i.statusLabelFile.Configure(Txt("Not saved"))
+	} else {
+		i.statusLabelFile.Configure(Foreground(colDarkGreen))
+		i.statusLabelFile.Configure(Txt("Saved"))
+	}
+}
+
+func (i *Ite) onGoToLine() {
+	dialog := Toplevel()
+	dialog.WmTitle("Go to Line")
+
+	frame := dialog.TFrame()
+	Grid(frame, Row(0), Column(0), Padx(10), Pady(10))
+
+	label := frame.TLabel(Txt("Line:Column (e.g. 12.5)"))
+	Grid(label, Row(0), Column(0), Sticky(W), Pady(5))
+
+	entry := frame.TEntry(Width(20), Textvariable(""))
+	Grid(entry, Row(1), Column(0), Pady(5))
+	Focus(entry)
+
+	btnFrame := frame.TFrame()
+	Grid(btnFrame, Row(2), Column(0), Pady(10))
+
+	okBtn := btnFrame.TButton(Txt("OK"), Command(func() {
+		input := entry.Textvariable()
+
+		if input == "" {
+			return
+		}
+
+		line := 1
+		col := 0
+
+		if strings.Contains(input, ".") {
+			fmt.Sscanf(input, "%d.%d", &line, &col)
+		} else {
+			fmt.Sscanf(input, "%d", &line)
+		}
+
+		index := fmt.Sprintf("%d.%d", line, col)
+
+		i.editText.MarkSet("insert", index)
+		i.editText.See(index)
+		i.updateCursorPosition()
+
+		Destroy(dialog)
+		Focus(i.editText)
+	}))
+	Grid(okBtn, Row(0), Column(0), Padx(5))
+
+	cancelBtn := btnFrame.TButton(Txt("Cancel"), Command(func() {
+		Destroy(dialog)
+	}))
+	Grid(cancelBtn, Row(0), Column(1), Padx(5))
+
+	Bind(entry, "<Return>", Command(func() { okBtn.Invoke() }))
+}
+
+func (i *Ite) onGoBuild() {
+	cmd := exec.Command("/usr/local/go/bin/go", "build", "./...")
+	err := cmd.Run()
+	if err != nil {
+		i.statusLabelGo.Configure(Foreground(colRed))
+		i.statusLabelGo.Configure(Txt("Error Build"))
+	} else {
+		i.statusLabelGo.Configure(Foreground(colDarkGreen))
+		i.statusLabelGo.Configure(Txt("Go command"))
+	}
+
+}
+
+func (i *Ite) onGoRun() {
+	cmd := exec.Command("/usr/local/go/bin/go", "run", "./...")
+	if err := cmd.Run(); err != nil {
+		i.statusLabelGo.Configure(Foreground(colRed))
+		i.statusLabelGo.Configure(Txt("Error Run"))
+
+	}
+}
+
