@@ -28,14 +28,16 @@ const (
 
 type Ite struct {
 	editFrame         *TFrameWidget
+	editFrame2        *TFrameWidget
 	toolbarFrame      *TFrameWidget
 	editText          *TextWidget
+	editText2         *TextWidget
 	editVScrollbar    *TScrollbarWidget
+	editVScrollbar2   *TScrollbarWidget
 	currentFile       string
 	statusFrame       *TFrameWidget
 	statusLabelCursor *TLabelWidget
 	statusLabelFile   *TLabelWidget
-	statusLabelGo     *TLabelWidget
 }
 
 func main() {
@@ -43,7 +45,7 @@ func main() {
 }
 
 func (i *Ite) Run() {
-	WmGeometry(App, "950x600")
+	WmGeometry(App, "1200x600")
 	WmDeiconify(App)
 	App.Wait()
 }
@@ -105,6 +107,16 @@ func (i *Ite) makeEditor() {
 		}))
 	i.editVScrollbar = i.editFrame.TScrollbar(Command(
 		func(event *Event) { event.Yview(i.editText) }))
+
+	i.editFrame2 = TFrame()
+	i.editVScrollbar2 = i.editFrame2.TScrollbar()
+	i.editText2 = i.editFrame2.Text(
+		textStyle(),
+		Yscrollcommand(func(event *Event) {
+			event.ScrollSet(i.editVScrollbar2)
+		}))
+	i.editVScrollbar2 = i.editFrame2.TScrollbar(Command(
+		func(event *Event) { event.Yview(i.editText2) }))
 }
 
 func (i *Ite) makeToolbar() {
@@ -136,7 +148,6 @@ func (i *Ite) makeStatusbar() {
 	i.statusFrame = TFrame(Relief(SUNKEN))
 	i.statusLabelCursor = i.statusFrame.TLabel(Txt("Line:Column 0:0"), Background(colApricotWhite), Font("GoMono", 11))
 	i.statusLabelFile = i.statusFrame.TLabel(Txt("Not saved"), Background(colApricotWhite), Font("GoMono", 11))
-	i.statusLabelGo = i.statusFrame.TLabel(Txt("Go Command"), Background(colApricotWhite), Font("GoMono", 11))
 }
 
 func (i *Ite) makeWidgets() {
@@ -146,7 +157,7 @@ func (i *Ite) makeWidgets() {
 }
 
 func (i *Ite) makeLayout() {
-	Grid(i.toolbarFrame, Row(0), Column(0), Sticky(WE))
+	Grid(i.toolbarFrame, Row(0), Column(0), Columnspan(2), Sticky(WE))
 
 	Grid(i.editText, Row(0), Column(0), Sticky(NEWS))
 	Grid(i.editVScrollbar, Row(0), Column(1), Sticky(NS))
@@ -154,13 +165,19 @@ func (i *Ite) makeLayout() {
 	GridColumnConfigure(i.editFrame, 0, Weight(1))
 	Grid(i.editFrame, Row(1), Column(0), Sticky(NEWS))
 
+	Grid(i.editText2, Row(0), Column(0), Sticky(NEWS))
+	Grid(i.editVScrollbar2, Row(0), Column(1), Sticky(NS))
+	GridRowConfigure(i.editFrame2, 0, Weight(1))
+	GridColumnConfigure(i.editFrame2, 0, Weight(1))
+	Grid(i.editFrame2, Row(1), Column(1), Sticky(NEWS))
+
 	Grid(i.statusLabelCursor, Row(0), Column(0), Sticky(WE))
 	Grid(i.statusLabelFile, Row(0), Column(1), Sticky(WE))
-	Grid(i.statusLabelGo, Row(0), Column(2), Sticky(WE))
 	GridColumnConfigure(i.statusFrame, 0, Weight(1))
-	Grid(i.statusFrame, Row(2), Column(0), Sticky(WE))
+	Grid(i.statusFrame, Row(2), Column(0), Columnspan(2), Sticky(WE))
 
 	GridColumnConfigure(App, 0, Weight(1))
+	GridColumnConfigure(App, 1, Weight(3))
 	GridRowConfigure(App, 1, Weight(1))
 }
 
@@ -232,7 +249,7 @@ func (i *Ite) onQuit() { Destroy(App) }
 
 func (i *Ite) updateCursorPosition() {
 	pos := i.editText.Index("insert")
-	i.statusLabelCursor.Configure(Txt("Line.Column " + pos))
+	i.statusLabelCursor.Configure(Txt("Line:Column " + pos))
 
 	if i.editText.Modified() {
 		i.statusLabelFile.Configure(Foreground(colRed))
@@ -296,24 +313,29 @@ func (i *Ite) onGoToLine() {
 }
 
 func (i *Ite) onGoBuild() {
+	i.editText2.Clear()
+	
 	cmd := exec.Command("/usr/local/go/bin/go", "build", "./...")
-	err := cmd.Run()
+	output, err := cmd.CombinedOutput()
+	
+	i.editText2.Clear()
 	if err != nil {
-		i.statusLabelGo.Configure(Foreground(colRed))
-		i.statusLabelGo.Configure(Txt("Error Build"))
+		i.editText2.Insert("1.0", fmt.Sprintf("Build failed:\n%s\n", string(output)))
 	} else {
-		i.statusLabelGo.Configure(Foreground(colDarkGreen))
-		i.statusLabelGo.Configure(Txt("Go command"))
+		i.editText2.Insert("1.0", "Build successful!\n")
 	}
-
 }
 
 func (i *Ite) onGoRun() {
+	i.editText2.Clear()
+	
 	cmd := exec.Command("/usr/local/go/bin/go", "run", "./...")
-	if err := cmd.Run(); err != nil {
-		i.statusLabelGo.Configure(Foreground(colRed))
-		i.statusLabelGo.Configure(Txt("Error Run"))
-
+	output, err := cmd.CombinedOutput()
+	
+	i.editText2.Clear()
+	if err != nil {
+		i.editText2.Insert("1.0", fmt.Sprintf("Run failed:\n%s\n", string(output)))
+	} else {
+		i.editText2.Insert("1.0", fmt.Sprintf("Program output:\n%s", string(output)))
 	}
 }
-
