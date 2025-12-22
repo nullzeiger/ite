@@ -1,6 +1,5 @@
-// Copyright 2025 Ivan Guerreschi. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
+// Copyright 2025 Ivan Guerreschi.
+// BSD-style license.
 
 package main
 
@@ -10,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	. "modernc.org/tk9.0"
 )
@@ -38,6 +38,7 @@ type Ite struct {
 	statusFrame       *TFrameWidget
 	statusLabelCursor *TLabelWidget
 	statusLabelFile   *TLabelWidget
+	buildChan         chan string
 }
 
 func main() {
@@ -51,7 +52,9 @@ func (i *Ite) Run() {
 }
 
 func NewIte() *Ite {
-	i := &Ite{}
+	i := &Ite{
+		buildChan: make(chan string, 1),
+	}
 	App.WmTitle("Untitled - ITE")
 	WmProtocol(App, "WM_DELETE_WINDOW", i.onQuit)
 	i.makeWidgets()
@@ -59,6 +62,10 @@ func NewIte() *Ite {
 	i.bindShortcuts()
 
 	i.globalStyle()
+
+	// avvia polling per output build/run (gira nel thread Tk)
+	TclAfter(100*time.Millisecond, i.pollBuildOutput)
+
 	return i
 }
 
@@ -88,12 +95,6 @@ func textStyle() Opts {
 		Tabs("1c"),
 		Wrap("word"),
 		Undo(true),
-	}
-}
-
-func statusStyle() Opts {
-	return Opts{
-		Background(colApricotWhite),
 	}
 }
 
@@ -157,25 +158,30 @@ func (i *Ite) makeWidgets() {
 }
 
 func (i *Ite) makeLayout() {
+	// toolbar in alto
 	Grid(i.toolbarFrame, Row(0), Column(0), Columnspan(2), Sticky(WE))
 
+	// primo editor a sinistra
 	Grid(i.editText, Row(0), Column(0), Sticky(NEWS))
 	Grid(i.editVScrollbar, Row(0), Column(1), Sticky(NS))
 	GridRowConfigure(i.editFrame, 0, Weight(1))
 	GridColumnConfigure(i.editFrame, 0, Weight(1))
 	Grid(i.editFrame, Row(1), Column(0), Sticky(NEWS))
 
+	// secondo editor a destra
 	Grid(i.editText2, Row(0), Column(0), Sticky(NEWS))
 	Grid(i.editVScrollbar2, Row(0), Column(1), Sticky(NS))
 	GridRowConfigure(i.editFrame2, 0, Weight(1))
 	GridColumnConfigure(i.editFrame2, 0, Weight(1))
 	Grid(i.editFrame2, Row(1), Column(1), Sticky(NEWS))
 
+	// statusbar in basso
 	Grid(i.statusLabelCursor, Row(0), Column(0), Sticky(WE))
 	Grid(i.statusLabelFile, Row(0), Column(1), Sticky(WE))
 	GridColumnConfigure(i.statusFrame, 0, Weight(1))
 	Grid(i.statusFrame, Row(2), Column(0), Columnspan(2), Sticky(WE))
 
+	// configura colonne/righe root
 	GridColumnConfigure(App, 0, Weight(1))
 	GridColumnConfigure(App, 1, Weight(3))
 	GridRowConfigure(App, 1, Weight(1))
@@ -186,6 +192,8 @@ func (i *Ite) bindShortcuts() {
 	Bind(App, "<Control-o>", Command(i.onOpen))
 	Bind(App, "<Control-s>", Command(i.onSave))
 	Bind(App, "<Control-q>", Command(i.onQuit))
+	Bind(App, "<Control-b>", Command(i.onGoBuild))
+	Bind(App, "<Control-r>", Command(i.onGoRun))
 	Bind(App, "<Control-g>", Command(i.onGoToLine))
 	Bind(i.editText, "<ButtonRelease-1>", Command(i.updateCursorPosition))
 	Bind(i.editText, "<KeyRelease>", Command(i.updateCursorPosition))
@@ -233,19 +241,10 @@ func (i *Ite) onSave() {
 	i.editText.SetModified(false)
 }
 
-func (i *Ite) onCut() {
-	i.editText.Cut()
-}
-
-func (i *Ite) onCopy() {
-	i.editText.Copy()
-}
-
-func (i *Ite) onPaste() {
-	i.editText.Paste()
-}
-
-func (i *Ite) onQuit() { Destroy(App) }
+func (i *Ite) onCut()   { i.editText.Cut() }
+func (i *Ite) onCopy()  { i.editText.Copy() }
+func (i *Ite) onPaste() { i.editText.Paste() }
+func (i *Ite) onQuit()  { Destroy(App) }
 
 func (i *Ite) updateCursorPosition() {
 	pos := i.editText.Index("insert")
@@ -314,28 +313,88 @@ func (i *Ite) onGoToLine() {
 
 func (i *Ite) onGoBuild() {
 	i.editText2.Clear()
-	
-	cmd := exec.Command("/usr/local/go/bin/go", "build", "./...")
-	output, err := cmd.CombinedOutput()
-	
-	i.editText2.Clear()
-	if err != nil {
-		i.editText2.Insert("1.0", fmt.Sprintf("Build failed:\n%s\n", string(output)))
-	} else {
-		i.editText2.Insert("1.0", "Build successful!\n")
-	}
+	i.editText2.Insert("1.0", "Building...\n")
+
+	go func() {
+		cmd := exec.Command("go", "build", "./...")
+		if i.currentFile != "" {
+			cmd.Dir = filepath.Dir(i.currentFile)
+		}
+
+		output, err := cmd.CombinedOutput()
+
+		var msg string
+		if err != nil {
+			if len(output) == 0 {
+				msg = fmt.Sprintf("Build failed (no output): %v\n", err)
+			} else {
+				msg = "Build failed:\n" + string(output)
+			}
+		} else if len(output) == 0 {
+			msg = "Build successful (no output)\n"
+		} else {
+			msg = "Build output:\n" + string(output)
+		}
+
+		// invia solo dati al thread UI
+		select {
+		case i.buildChan <- msg:
+		default:
+			// se il canale è pieno, sovrascriviamo (per non bloccare la goroutine)
+			select {
+			case <-i.buildChan:
+			default:
+			}
+			i.buildChan <- msg
+		}
+	}()
 }
 
 func (i *Ite) onGoRun() {
 	i.editText2.Clear()
-	
-	cmd := exec.Command("/usr/local/go/bin/go", "run", "./...")
-	output, err := cmd.CombinedOutput()
-	
-	i.editText2.Clear()
-	if err != nil {
-		i.editText2.Insert("1.0", fmt.Sprintf("Run failed:\n%s\n", string(output)))
-	} else {
-		i.editText2.Insert("1.0", fmt.Sprintf("Program output:\n%s", string(output)))
-	}
+	i.editText2.Insert("1.0", "Running...\n")
+
+	go func() {
+		cmd := exec.Command("go", "run", "./...")
+		if i.currentFile != "" {
+			cmd.Dir = filepath.Dir(i.currentFile)
+		}
+
+		output, err := cmd.CombinedOutput()
+
+		var msg string
+		if err != nil {
+			if len(output) == 0 {
+				msg = fmt.Sprintf("Run failed (no output): %v\n", err)
+			} else {
+				msg = "Run failed:\n" + string(output)
+			}
+		} else if len(output) == 0 {
+			msg = "Program finished (no output)\n"
+		} else {
+			msg = "Program output:\n" + string(output)
+		}
+
+		select {
+		case i.buildChan <- msg:
+		default:
+			select {
+			case <-i.buildChan:
+			default:
+			}
+			i.buildChan <- msg
+		}
+	}()
 }
+
+func (i *Ite) pollBuildOutput() {
+	select {
+	case msg := <-i.buildChan:
+		i.editText2.Clear()
+		i.editText2.Insert("1.0", msg)
+	default:
+	}
+	// Riesegui il polling (gira nel thread Tk)
+	TclAfter(100*time.Millisecond, i.pollBuildOutput)
+}
+
